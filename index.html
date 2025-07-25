@@ -85,6 +85,56 @@
         .page.active {
             display: block;
         }
+        
+        .notice-box {
+            background-color: #e6f7ff;
+            border: 1px solid #91d5ff;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .notice-box span {
+            font-size: 20px;
+            margin-top: 2px;
+        }
+
+        .notice-box p {
+            margin: 0;
+            color: #034c8a;
+            font-weight: 500;
+        }
+        
+        /* [수정됨] 공지사항 리스트 스타일 */
+        .weekly-notice-list {
+            list-style-type: none;
+            padding-left: 0;
+            margin-top: 10px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr); /* 3열 고정 그리드 */
+            gap: 8px; /* 항목 간 간격 */
+        }
+
+        .weekly-notice-list li {
+            background-color: #fff;
+            border: 1px solid #d9e2ff;
+            border-radius: 4px;
+            padding: 5px 10px;
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.2s ease;
+            font-size: 14px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .weekly-notice-list li:hover {
+            background-color: #f0f8ff;
+            transform: translateX(2px);
+        }
 
         .form-group {
             margin-bottom: 20px;
@@ -390,7 +440,6 @@
         <div id="connection-status" class="status-indicator" style="display: none;"></div>
 
         <div class="nav-buttons">
-            <!-- [수정됨] onclick 핸들러에 this 전달 -->
             <button class="nav-btn active" onclick="showPage('search', this)">🔍 검색</button>
             <button class="nav-btn" onclick="showPage('manage', this)">⚙️ DB 관리</button>
         </div>
@@ -398,6 +447,15 @@
         <!-- 검색 페이지 -->
         <div id="search-page" class="page active">
             <h2>동영상 검색</h2>
+            
+            <!-- 주간 등록 정보 공지사항 -->
+            <div id="weekly-notice" class="notice-box">
+                <span>📢</span>
+                <div id="weekly-notice-content">
+                    <p>이번 주 신규 등록 정보를 불러오는 중...</p>
+                </div>
+            </div>
+            
             <div style="display: flex; gap: 15px; margin-bottom: 20px; align-items: end;">
                 <div class="form-group" style="flex: 1; margin-bottom: 0; position: relative;">
                     <label>통합 검색</label>
@@ -566,6 +624,46 @@
             document.getElementById('data-table-body').innerHTML = '<tr><td colspan="7" class="error">Firebase 연결에 실패했습니다.</td></tr>';
         }
 
+        // 주간 등록 정보 공지사항 및 리스트 표시 함수
+        function displayWeeklyNotice() {
+            const noticeContentElement = document.getElementById('weekly-notice-content');
+            if (!noticeContentElement) return;
+
+            const today = new Date();
+            // 이번 주의 시작(일요일)을 계산합니다.
+            const startOfWeek = new Date(today);
+            startOfWeek.setDate(startOfWeek.getDate() - today.getDay());
+            startOfWeek.setHours(0, 0, 0, 0); // 날짜의 시작 시간으로 설정
+
+            const weeklyVideos = videos.filter(video => {
+                if (!video.createdAt || typeof video.createdAt.toDate !== 'function') {
+                    if (video.createdAt instanceof Date) {
+                        return video.createdAt >= startOfWeek;
+                    }
+                    return false;
+                }
+                const registrationDate = video.createdAt.toDate();
+                return registrationDate >= startOfWeek;
+            });
+
+            const weeklyCount = weeklyVideos.length;
+            let noticeHtml = '';
+
+            if (weeklyCount > 0) {
+                noticeHtml += `<p>이번 주에 새로 등록된 정보는 총 <strong>${weeklyCount}</strong>개입니다.</p>`;
+                noticeHtml += `<ul class="weekly-notice-list">`;
+                weeklyVideos.forEach(video => {
+                    const searchTerm = (video.product || '').replace(/'/g, "\\'");
+                    noticeHtml += `<li onclick="searchByTerm('${searchTerm}')" title="클릭하여 '${searchTerm}' 검색">${video.product || '제목 없음'}</li>`;
+                });
+                noticeHtml += `</ul>`;
+            } else {
+                noticeHtml = `<p>이번 주에 새로 등록된 정보가 없습니다.</p>`;
+            }
+            
+            noticeContentElement.innerHTML = noticeHtml;
+        }
+        
         // Firestore에서 동영상 데이터 로드
         async function loadVideosFromFirestore() {
             if (!db) {
@@ -590,6 +688,7 @@
                 console.log('Firestore에서 로드된 동영상 수:', videos.length);
                 
                 // UI 업데이트
+                displayWeeklyNotice();
                 resetSearchResults();
                 loadDataTable();
                 
@@ -685,34 +784,28 @@
             }
         }
 
-        // [수정됨] DB 관리 페이지 비밀번호 기능 추가
+        // DB 관리 페이지 비밀번호 기능 추가
         function showPage(pageName, buttonElement) {
-            // 'manage' 페이지에 접근할 때만 비밀번호를 묻습니다.
             if (pageName === 'manage') {
-                // 이 곳에서 비밀번호를 원하는 값으로 변경할 수 있습니다.
                 const adminPassword = "1234"; 
                 const userInput = prompt("관리자 비밀번호를 입력하세요:");
 
-                // 사용자가 '취소'를 누르거나 아무것도 입력하지 않은 경우
                 if (userInput === null || userInput === "") {
                     return; 
                 }
                 
-                // 비밀번호가 틀린 경우
                 if (userInput !== adminPassword) {
                     alert("비밀번호가 일치하지 않습니다.");
-                    return; // 함수를 중단하여 페이지 전환을 막습니다.
+                    return;
                 }
             }
             
-            // 비밀번호가 맞거나 'manage' 페이지가 아닌 경우, 페이지를 전환합니다.
             document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
             document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
             
             document.getElementById(pageName + '-page').classList.add('active');
             buttonElement.classList.add('active');
             
-            // 'manage' 페이지로 전환된 경우, 데이터 테이블을 다시 로드합니다.
             if (pageName === 'manage') {
                 loadDataTable();
             }
@@ -738,7 +831,7 @@
             } else if (videos.length === 0) {
                 document.getElementById('search-results').innerHTML = '<div class="no-results">저장된 동영상이 없습니다. DB 관리에서 동영상을 추가해보세요.</div>';
             } else {
-                displaySearchResults(videos); // 초기 상태에서는 모든 비디오를 표시
+                displaySearchResults(videos);
             }
             document.getElementById('search-count').style.display = 'none';
         }
@@ -770,6 +863,13 @@
             document.getElementById('search-count').style.display = 'block';
 
             displaySearchResults(filteredVideos);
+        }
+
+        // 공지사항 리스트 항목 클릭 시 검색 실행
+        function searchByTerm(term) {
+            if (!term) return;
+            document.getElementById('unified-search').value = term;
+            searchVideos();
         }
 
         // 엔터키 검색 지원
@@ -872,6 +972,7 @@
             if (success) {
                 clearForm();
                 loadDataTable();
+                displayWeeklyNotice();
                 showManageStatus('동영상이 추가되었습니다.', 'success');
             }
 
@@ -954,6 +1055,7 @@
             
             if (success) {
                 loadDataTable();
+                displayWeeklyNotice();
                 showManageStatus('동영상이 삭제되었습니다.', 'success');
             }
         }
@@ -968,7 +1070,7 @@
             document.getElementById('tag').value = '';
         }
 
-        // [신규] 클립보드 복사 함수
+        // 클립보드 복사 함수
         function copyToClipboard(text, buttonElement) {
             const textArea = document.createElement('textarea');
             textArea.value = text;
@@ -1079,7 +1181,6 @@
         // 페이지 로드 시 Firebase 초기화 및 초기 데이터 표시
         window.addEventListener('load', async () => {
             await initFirebase();
-            // 로딩이 완료되면 검색 결과 영역에 전체 비디오 목록을 기본으로 표시
             if (videos.length > 0) {
                 displaySearchResults(videos);
             }
