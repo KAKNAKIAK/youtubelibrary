@@ -390,8 +390,9 @@
         <div id="connection-status" class="status-indicator" style="display: none;"></div>
 
         <div class="nav-buttons">
-            <button class="nav-btn active" onclick="showPage('search')">🔍 검색</button>
-            <button class="nav-btn" onclick="showPage('manage')">⚙️ DB 관리</button>
+            <!-- [수정됨] onclick 핸들러에 this 전달 -->
+            <button class="nav-btn active" onclick="showPage('search', this)">🔍 검색</button>
+            <button class="nav-btn" onclick="showPage('manage', this)">⚙️ DB 관리</button>
         </div>
 
         <!-- 검색 페이지 -->
@@ -684,14 +685,34 @@
             }
         }
 
-        // 페이지 전환
-        function showPage(pageName) {
+        // [수정됨] DB 관리 페이지 비밀번호 기능 추가
+        function showPage(pageName, buttonElement) {
+            // 'manage' 페이지에 접근할 때만 비밀번호를 묻습니다.
+            if (pageName === 'manage') {
+                // 이 곳에서 비밀번호를 원하는 값으로 변경할 수 있습니다.
+                const adminPassword = "1234"; 
+                const userInput = prompt("관리자 비밀번호를 입력하세요:");
+
+                // 사용자가 '취소'를 누르거나 아무것도 입력하지 않은 경우
+                if (userInput === null || userInput === "") {
+                    return; 
+                }
+                
+                // 비밀번호가 틀린 경우
+                if (userInput !== adminPassword) {
+                    alert("비밀번호가 일치하지 않습니다.");
+                    return; // 함수를 중단하여 페이지 전환을 막습니다.
+                }
+            }
+            
+            // 비밀번호가 맞거나 'manage' 페이지가 아닌 경우, 페이지를 전환합니다.
             document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
             document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
             
             document.getElementById(pageName + '-page').classList.add('active');
-            event.target.classList.add('active');
+            buttonElement.classList.add('active');
             
+            // 'manage' 페이지로 전환된 경우, 데이터 테이블을 다시 로드합니다.
             if (pageName === 'manage') {
                 loadDataTable();
             }
@@ -995,7 +1016,6 @@
                                 ${video.brand ? `<span class="meta-tag">🏢 ${video.brand}</span>` : ''}
                                 ${video.tag ? `<span class="meta-tag">🏷️ ${video.tag}</span>` : ''}
                             </div>
-                            <!-- [수정됨] 버튼 영역 -->
                             <div class="video-actions">
                                 <button class="btn watch-btn" onclick="window.open('${video.youtubeUrl}', '_blank')">
                                     🎥 동영상 보기
@@ -1044,7 +1064,6 @@
                         <td>${video.brand || '-'}</td>
                         <td>${video.product || '-'}</td>
                         <td>${video.tag || '-'}</td>
-                        <!-- [수정됨] 액션 버튼에 복사 버튼 추가 -->
                         <td>
                             <button class="action-btn edit-btn" onclick="editVideo(${index})">수정</button>
                             <button class="action-btn delete-btn" onclick="deleteVideo(${index})">삭제</button>
